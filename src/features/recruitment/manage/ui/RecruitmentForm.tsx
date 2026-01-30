@@ -230,13 +230,13 @@ export function RecruitmentForm({ mode, id }: RecruitmentFormProps) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 첨부파일 (선택)
               </label>
-              <Input 
-                type="file" 
-                accept=".pdf,.hwp" 
-                onChange={handleFileChange} 
+              <Input
+                type="file"
+                accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
               />
               <p className="mt-1 text-xs text-secondary">
-                PDF 또는 HWP 형식만 업로드 가능합니다.
+                PDF, HWP, Word, JPG, PNG 형식 업로드 가능합니다.
                 {mode === 'edit' && ' 새 파일을 업로드하지 않으면 기존 파일이 유지됩니다.'}
               </p>
             </div>

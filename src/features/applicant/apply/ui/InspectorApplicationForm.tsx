@@ -32,6 +32,7 @@ import {
   APPLICANT_GRADE_LEVEL_OPTIONS,
   APPLICANT_SPECIALTY_OPTIONS,
   APPLICANT_ZONE_OPTIONS,
+  ATTACHMENT_DISPLAY_ORDER,
   REQUIRED_ATTACHMENT_KEYS,
 } from '@/features/applicant/shared/constants';
 
@@ -120,6 +121,42 @@ export function InspectorApplicationForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  // 중복 파일명 체크 함수
+  const isDuplicateFilename = useCallback((
+    filename: string,
+    options?: {
+      excludeAttachmentKey?: ApplicantAttachmentUploadKey;
+      excludeCareerIndex?: number;
+    }
+  ) => {
+    const { excludeAttachmentKey, excludeCareerIndex } = options ?? {};
+
+    // 필수 첨부파일에서 중복 체크
+    const attachmentFilenames = Object.entries(attachments)
+      .filter(([key, file]) => file && key !== excludeAttachmentKey)
+      .map(([, file]) => file!.name);
+
+    // 경력증명서에서 중복 체크
+    const careerFilenames = careerCertificates
+      .filter((file, index): file is File => file !== null && index !== excludeCareerIndex)
+      .map((file) => file.name);
+
+    // 권역변경 첨부파일에서 중복 체크
+    const zoneChangeFilenames = zoneChangeAttachments.map((file) => file.name);
+
+    const allFilenames = [...attachmentFilenames, ...careerFilenames, ...zoneChangeFilenames];
+    return allFilenames.includes(filename);
+  }, [attachments, careerCertificates, zoneChangeAttachments]);
+
+  // 첨부파일 변경 핸들러 (중복 체크 포함)
+  const handleAttachmentChange = useCallback((key: ApplicantAttachmentUploadKey, file: File | null) => {
+    if (file && isDuplicateFilename(file.name, { excludeAttachmentKey: key })) {
+      toast.error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해 주세요.');
+      return;
+    }
+    setAttachments((prev) => ({ ...prev, [key]: file }));
+  }, [isDuplicateFilename]);
 
   useEffect(() => {
     hydrate();
@@ -249,8 +286,11 @@ export function InspectorApplicationForm() {
     });
   };
 
-  const handleCareerCertificateChange = (index: number, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
+  const handleCareerCertificateChange = (index: number, file: File | null) => {
+    if (file && isDuplicateFilename(file.name, { excludeCareerIndex: index })) {
+      toast.error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해 주세요.');
+      return;
+    }
     setCareerCertificates((prev) => {
       const next = [...prev];
       next[index] = file;
@@ -278,6 +318,13 @@ export function InspectorApplicationForm() {
   };
 
   const removeTechnicalPersonnelRow = (index: number) => {
+    // 최소 인력 수 체크
+    const currentMinCount = form.appliedScales.includes('3등급') ? 2 : form.appliedScales.includes('2등급') ? 1 : 1;
+    if (form.technicalPersonnel.length <= currentMinCount) {
+      toast.error(`최소 ${currentMinCount}명의 인력이 필요합니다.`);
+      return;
+    }
+
     if (!window.confirm('해당 인력 정보를 삭제하시겠습니까?')) {
       return;
     }
@@ -285,12 +332,11 @@ export function InspectorApplicationForm() {
       const nextRows = prev.technicalPersonnel.filter((_, rowIndex) => rowIndex !== index);
       return {
         ...prev,
-        technicalPersonnel: nextRows.length > 0 ? nextRows : [defaultTechnicalPersonnelRow],
+        technicalPersonnel: nextRows,
       };
     });
     setCareerCertificates((prev) => {
-      const next = prev.filter((_, rowIndex) => rowIndex !== index);
-      return next.length > 0 ? next : [...initialCareerCertificateState];
+      return prev.filter((_, rowIndex) => rowIndex !== index);
     });
   };
 
@@ -310,6 +356,24 @@ export function InspectorApplicationForm() {
 
   const handleZoneChangeAttachmentsChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files ? Array.from(event.target.files) : [];
+
+    // 중복 파일명 체크 (권역변경 첨부파일 제외하고 체크)
+    const duplicates = files.filter((file) => {
+      const attachmentFilenames = Object.values(attachments)
+        .filter((f): f is File => f !== null)
+        .map((f) => f.name);
+      const careerFilenames = careerCertificates
+        .filter((f): f is File => f !== null)
+        .map((f) => f.name);
+      return [...attachmentFilenames, ...careerFilenames].includes(file.name);
+    });
+
+    if (duplicates.length > 0) {
+      toast.error(`동일한 파일명이 이미 존재합니다: ${duplicates.map((f) => f.name).join(', ')}`);
+      event.target.value = '';
+      return;
+    }
+
     setZoneChangeAttachments(files);
     event.target.value = '';
   };
@@ -323,6 +387,52 @@ export function InspectorApplicationForm() {
   }, [attachments]);
 
   const hasRequiredAttachments = attachmentErrors.length === 0;
+
+  // 2등급 또는 3등급이 선택된 경우에만 소속 기술인력 섹션 표시
+  const requiresPersonnel = useMemo(() => {
+    return form.appliedScales.includes('2등급') || form.appliedScales.includes('3등급');
+  }, [form.appliedScales]);
+
+  // 등급에 따른 최소 인력 수 계산
+  const minPersonnelCount = useMemo(() => {
+    if (form.appliedScales.includes('3등급')) return 2;
+    if (form.appliedScales.includes('2등급')) return 1;
+    return 0;
+  }, [form.appliedScales]);
+
+  // 등급 변경 시 자동으로 인력 추가
+  useEffect(() => {
+    if (!requiresPersonnel) {
+      // 인력 필요 없으면 초기화
+      setForm((prev) => ({
+        ...prev,
+        technicalPersonnel: [defaultTechnicalPersonnelRow],
+      }));
+      setCareerCertificates([...initialCareerCertificateState]);
+      return;
+    }
+
+    setForm((prev) => {
+      const currentCount = prev.technicalPersonnel.length;
+      if (currentCount < minPersonnelCount) {
+        const rowsToAdd = minPersonnelCount - currentCount;
+        const newRows = Array(rowsToAdd).fill(null).map(() => ({ ...defaultTechnicalPersonnelRow }));
+        return {
+          ...prev,
+          technicalPersonnel: [...prev.technicalPersonnel, ...newRows],
+        };
+      }
+      return prev;
+    });
+
+    setCareerCertificates((prev) => {
+      if (prev.length < minPersonnelCount) {
+        const rowsToAdd = minPersonnelCount - prev.length;
+        return [...prev, ...Array(rowsToAdd).fill(null)];
+      }
+      return prev;
+    });
+  }, [requiresPersonnel, minPersonnelCount]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -426,27 +536,35 @@ export function InspectorApplicationForm() {
       (row) => row.name || row.birthDate || row.gender || row.qualification || row.file,
     );
 
-    if (filledPersonnel.length === 0) {
-      toast.error('소속 기술인력을 최소 1명 입력해 주세요.');
-      return;
+    // 2등급 또는 3등급 선택 시에만 소속 기술인력 검증
+    const needsPersonnel = form.appliedScales.includes('2등급') || form.appliedScales.includes('3등급');
+    const requiredMinCount = form.appliedScales.includes('3등급') ? 2 : form.appliedScales.includes('2등급') ? 1 : 0;
+
+    if (needsPersonnel) {
+      if (filledPersonnel.length < requiredMinCount) {
+        toast.error(`소속 기술인력을 최소 ${requiredMinCount}명 입력해 주세요.`);
+        return;
+      }
+
+      const hasIncompleteRow = filledPersonnel.some(
+        (row) =>
+          !row.name || !row.birthDate || !row.gender || !row.qualification || row.file == null,
+      );
+
+      if (hasIncompleteRow) {
+        toast.error('소속 기술인력 정보와 경력증명서를 모두 입력해 주세요.');
+        return;
+      }
     }
 
-    const hasIncompleteRow = filledPersonnel.some(
-      (row) =>
-        !row.name || !row.birthDate || !row.gender || !row.qualification || row.file == null,
-    );
-
-    if (hasIncompleteRow) {
-      toast.error('소속 기술인력 정보와 경력증명서를 모두 입력해 주세요.');
-      return;
-    }
-
-    const personnelPayload: ApplicantPersonnel[] = filledPersonnel.map((row) => ({
-      name: row.name,
-      birthDate: row.birthDate,
-      gender: row.gender as ApplicantGender,
-      qualification: row.qualification,
-    }));
+    const personnelPayload: ApplicantPersonnel[] = needsPersonnel
+      ? filledPersonnel.map((row) => ({
+          name: row.name,
+          birthDate: row.birthDate,
+          gender: row.gender as ApplicantGender,
+          qualification: row.qualification,
+        }))
+      : [];
 
     const payload: ApplicantCreatePayload = {
       periodNumber,
@@ -485,7 +603,9 @@ export function InspectorApplicationForm() {
       }
     });
 
-    attachmentPayload.careerCertificates = filledPersonnel.map((row) => row.file!) as File[];
+    if (needsPersonnel && filledPersonnel.length > 0) {
+      attachmentPayload.careerCertificates = filledPersonnel.map((row) => row.file!) as File[];
+    }
 
     if (form.zoneChangeRequested && zoneChangeAttachments.length > 0) {
       attachmentPayload.zoneChangeAttachments = [...zoneChangeAttachments];
@@ -797,99 +917,91 @@ export function InspectorApplicationForm() {
             </SelectCardGroup>
           </div>
 
-          <div>
-            <h3 className="text-[20px] font-bold text-black">소속 기술인력</h3>
-            <div className="my-4 h-px" style={{ backgroundColor: '#666666' }} />
-            <p className="mt-1 text-sm text-secondary">
-              각 인력의 성명, 생년월일, 성별, 자격과 경력증명서를 입력해 주세요. 필요 시 추가 버튼으로 인력을 더 등록할 수 있습니다.
-            </p>
-            <div className="mt-4 space-y-4">
-              {form.technicalPersonnel.map((row, index) => {
-                const file = careerCertificates[index] ?? null;
-                return (
-                  <div key={index} className="flex flex-col gap-4 rounded-lg border border-border-light p-4">
-                    <div className="grid gap-3 md:grid-cols-5">
-                      <Input
-                        name={`technical-name-${index}`}
-                        value={row.name}
-                        onChange={(event) =>
-                          handleTechnicalPersonnelChange(index, 'name', event.target.value)
-                        }
-                        placeholder="성명"
-                        maxLength={50}
-                      />
-                      <Input
-                        name={`technical-birthDate-${index}`}
-                        type="date"
-                        value={row.birthDate}
-                        onChange={(event) =>
-                          handleTechnicalPersonnelChange(index, 'birthDate', event.target.value)
-                        }
-                        placeholder="생년월일"
-                      />
-                      <RadioGroup
-                        name={`technical-gender-${index}`}
-                        value={row.gender}
-                        onChange={(value) =>
-                          handleTechnicalPersonnelChange(index, 'gender', value)
-                        }
-                        direction="horizontal"
-                        centered
-                      >
-                        {APPLICANT_GENDER_OPTIONS.map((option) => (
-                          <Radio key={option.value} value={option.value} label={option.label} />
-                        ))}
-                      </RadioGroup>
-                      <Input
-                        name={`technical-qualification-${index}`}
-                        value={row.qualification}
-                        onChange={(event) =>
-                          handleTechnicalPersonnelChange(index, 'qualification', event.target.value)
-                        }
-                        placeholder="해당 자격"
-                        maxLength={50}
-                      />
-                      <div className="flex flex-col gap-2">
+          {requiresPersonnel && (
+            <div>
+              <h3 className="text-[20px] font-bold text-black">
+                소속 기술인력 <span style={{ color: '#FF0A73' }}>*</span>
+              </h3>
+              <div className="my-4 h-px" style={{ backgroundColor: '#666666' }} />
+              <p className="mt-1 text-sm text-secondary">
+                각 인력의 성명, 생년월일, 성별, 자격과 경력증명서를 입력해 주세요.
+                {minPersonnelCount > 1
+                  ? ` 3등급 선택 시 최소 ${minPersonnelCount}명의 인력이 필요합니다.`
+                  : ' 필요 시 추가 버튼으로 인력을 더 등록할 수 있습니다.'}
+              </p>
+              <div className="mt-4 space-y-4">
+                {form.technicalPersonnel.map((row, index) => {
+                  const file = careerCertificates[index] ?? null;
+                  const canRemove = form.technicalPersonnel.length > minPersonnelCount;
+                  return (
+                    <div key={index} className="flex flex-col gap-4 rounded-lg border border-border-light p-4">
+                      <div className="grid gap-3 md:grid-cols-5">
                         <Input
-                          name={`technical-careerCertificate-${index}`}
-                          type="file"
-                          accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
-                          onChange={(event) => handleCareerCertificateChange(index, event)}
+                          name={`technical-name-${index}`}
+                          value={row.name}
+                          onChange={(event) =>
+                            handleTechnicalPersonnelChange(index, 'name', event.target.value)
+                          }
+                          placeholder="성명"
+                          maxLength={50}
                         />
-                        {file && (
-                          <div className="flex items-center justify-between gap-2 text-xs text-secondary">
-                            <span className="truncate">선택된 파일: {file.name}</span>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="px-2 text-xs"
-                              onClick={() => clearCareerCertificate(index)}
-                            >
-                              삭제
-                            </Button>
-                          </div>
-                        )}
+                        <Input
+                          name={`technical-birthDate-${index}`}
+                          type="date"
+                          value={row.birthDate}
+                          onChange={(event) =>
+                            handleTechnicalPersonnelChange(index, 'birthDate', event.target.value)
+                          }
+                          placeholder="생년월일"
+                        />
+                        <RadioGroup
+                          name={`technical-gender-${index}`}
+                          value={row.gender}
+                          onChange={(value) =>
+                            handleTechnicalPersonnelChange(index, 'gender', value)
+                          }
+                          direction="horizontal"
+                          centered
+                        >
+                          {APPLICANT_GENDER_OPTIONS.map((option) => (
+                            <Radio key={option.value} value={option.value} label={option.label} />
+                          ))}
+                        </RadioGroup>
+                        <Input
+                          name={`technical-qualification-${index}`}
+                          value={row.qualification}
+                          onChange={(event) =>
+                            handleTechnicalPersonnelChange(index, 'qualification', event.target.value)
+                          }
+                          placeholder="해당 자격"
+                          maxLength={50}
+                        />
+                        <FileInput
+                          value={file}
+                          onChange={(newFile) => handleCareerCertificateChange(index, newFile as File | null)}
+                          accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => removeTechnicalPersonnelRow(index)}
+                          disabled={!canRemove}
+                        >
+                          삭제
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => removeTechnicalPersonnelRow(index)}
-                      >
-                        삭제
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-              <Button type="button" variant="secondary" size="sm" onClick={addTechnicalPersonnelRow}>
-                인력 추가
-              </Button>
+                  );
+                })}
+                <Button type="button" variant="secondary" size="sm" onClick={addTechnicalPersonnelRow}>
+                  인력 추가
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <h3 className="text-[20px] font-bold text-black">권역 변경 신청 (선택)</h3>
@@ -964,10 +1076,15 @@ export function InspectorApplicationForm() {
           </div>
 
           <div>
-            <h3 className="text-[20px] font-bold text-black">필수 첨부파일</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-[20px] font-bold text-black">필수 첨부파일</h3>
+              <span className="text-sm text-secondary">
+                (허용 확장자: PDF, HWP, Word, JPG, PNG)
+              </span>
+            </div>
             <div className="my-4 h-px" style={{ backgroundColor: '#666666' }} />
             <div className="mt-4 space-y-4">
-              {(Object.keys(APPLICANT_ATTACHMENT_LABELS) as ApplicantAttachmentUploadKey[]).map((key) => {
+              {ATTACHMENT_DISPLAY_ORDER.map((key) => {
                 const { label: labelText, required } = APPLICANT_ATTACHMENT_LABELS[key];
                 const file = attachments[key];
 
@@ -979,8 +1096,8 @@ export function InspectorApplicationForm() {
                     </label>
                     <FileInput
                       value={file}
-                      onChange={(file) => setAttachments((prev) => ({ ...prev, [key]: file as File | null }))}
-                      accept=".pdf,.hwp,.doc,.docx,.jpg,.png"
+                      onChange={(file) => handleAttachmentChange(key, file as File | null)}
+                      accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
                       width="400px"
                     />
                   </div>

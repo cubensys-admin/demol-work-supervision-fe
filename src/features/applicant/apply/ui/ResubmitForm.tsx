@@ -24,6 +24,7 @@ import {
   APPLICANT_PROBLEM_FIELD_LABELS,
   APPLICANT_SPECIALTY_OPTIONS,
   APPLICANT_ZONE_OPTIONS,
+  ATTACHMENT_DISPLAY_ORDER,
 } from "@/features/applicant/shared/constants";
 import type {
   ApplicantAttachmentUploadKey,
@@ -188,6 +189,42 @@ export function ResubmitForm({ applicationId, mode = 'resubmit' }: ResubmitFormP
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 중복 파일명 체크 함수
+  const isDuplicateFilename = useCallback((
+    filename: string,
+    options?: {
+      excludeAttachmentKey?: ApplicantAttachmentUploadKey;
+      excludeCareerIndex?: number;
+    }
+  ) => {
+    const { excludeAttachmentKey, excludeCareerIndex } = options ?? {};
+
+    // 필수 첨부파일에서 중복 체크
+    const attachmentFilenames = Object.entries(attachments)
+      .filter(([key, file]) => file && key !== excludeAttachmentKey)
+      .map(([, file]) => file!.name);
+
+    // 경력증명서에서 중복 체크
+    const careerFilenames = careerCertificates
+      .filter((file, index): file is File => file !== null && index !== excludeCareerIndex)
+      .map((file) => file.name);
+
+    // 권역변경 첨부파일에서 중복 체크
+    const zoneChangeFilenames = zoneChangeAttachments.map((file) => file.name);
+
+    const allFilenames = [...attachmentFilenames, ...careerFilenames, ...zoneChangeFilenames];
+    return allFilenames.includes(filename);
+  }, [attachments, careerCertificates, zoneChangeAttachments]);
+
+  // 첨부파일 변경 핸들러 (중복 체크 포함)
+  const handleAttachmentChange = useCallback((key: ApplicantAttachmentUploadKey, file: File | null) => {
+    if (file && isDuplicateFilename(file.name, { excludeAttachmentKey: key })) {
+      toast.error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해 주세요.');
+      return;
+    }
+    setAttachments((prev) => ({ ...prev, [key]: file }));
+  }, [isDuplicateFilename]);
+
   useEffect(() => {
     hydrate();
   }, [hydrate]);
@@ -324,14 +361,15 @@ export function ResubmitForm({ applicationId, mode = 'resubmit' }: ResubmitFormP
     });
   };
 
-  const handleCareerCertificateChange = (
-    index: number,
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
+  // 경력증명서 변경 핸들러 (중복 체크 포함)
+  const handleCareerCertificateChange = (index: number, file: File | null) => {
     if (!isEditable("personnel") && !problemFieldSet.has("careerCertificates")) {
       return;
     }
-    const file = event.target.files?.[0] ?? null;
+    if (file && isDuplicateFilename(file.name, { excludeCareerIndex: index })) {
+      toast.error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해 주세요.');
+      return;
+    }
     setCareerCertificates((prev) => {
       const next = [...prev];
       next[index] = file;
@@ -401,6 +439,24 @@ export function ResubmitForm({ applicationId, mode = 'resubmit' }: ResubmitFormP
   const handleZoneChangeAttachmentsChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (!canEditZoneChange) return;
     const files = event.target.files ? Array.from(event.target.files) : [];
+
+    // 중복 파일명 체크 (권역변경 첨부파일 제외하고 체크)
+    const duplicates = files.filter((file) => {
+      const attachmentFilenames = Object.values(attachments)
+        .filter((f): f is File => f !== null)
+        .map((f) => f.name);
+      const careerFilenames = careerCertificates
+        .filter((f): f is File => f !== null)
+        .map((f) => f.name);
+      return [...attachmentFilenames, ...careerFilenames].includes(file.name);
+    });
+
+    if (duplicates.length > 0) {
+      toast.error(`동일한 파일명이 이미 존재합니다: ${duplicates.map((f) => f.name).join(', ')}`);
+      event.target.value = '';
+      return;
+    }
+
     setZoneChangeAttachments(files);
     event.target.value = "";
   };
@@ -1035,7 +1091,7 @@ export function ResubmitForm({ applicationId, mode = 'resubmit' }: ResubmitFormP
                         <Input
                           type="file"
                           accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
-                          onChange={(event) => handleCareerCertificateChange(index, event)}
+                          onChange={(event) => handleCareerCertificateChange(index, event.target.files?.[0] ?? null)}
                           disabled={!canEditTechnical}
                           className={!canEditTechnical ? "cursor-not-allowed bg-gray-100 text-secondary" : undefined}
                         />
@@ -1154,10 +1210,15 @@ export function ResubmitForm({ applicationId, mode = 'resubmit' }: ResubmitFormP
           </div>
 
           <div>
-            <h3 className="text-[20px] font-bold text-black">필수 첨부파일</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-[20px] font-bold text-black">필수 첨부파일</h3>
+              <span className="text-sm text-secondary">
+                (허용 확장자: PDF, HWP, Word, JPG, PNG)
+              </span>
+            </div>
             <div className="my-4 h-px" style={{ backgroundColor: '#666666' }} />
             <div className="mt-4 space-y-4">
-              {(Object.keys(APPLICANT_ATTACHMENT_LABELS) as ApplicantAttachmentUploadKey[]).map((key) => {
+              {ATTACHMENT_DISPLAY_ORDER.map((key) => {
                 const { label: labelText, required } = APPLICANT_ATTACHMENT_LABELS[key];
                 const file = attachments[key];
                 const canEditAttachment = isEditMode || flaggedAttachmentKeys.includes(key);
@@ -1170,8 +1231,8 @@ export function ResubmitForm({ applicationId, mode = 'resubmit' }: ResubmitFormP
                     </label>
                     <FileInput
                       value={file}
-                      onChange={(file) => setAttachments((prev) => ({ ...prev, [key]: file as File | null }))}
-                      accept=".pdf,.hwp,.doc,.docx,.jpg,.png"
+                      onChange={(file) => handleAttachmentChange(key, file as File | null)}
+                      accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
                       width="400px"
                       disabled={!canEditAttachment}
                     />

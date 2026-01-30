@@ -235,6 +235,7 @@ export function ResourceForm({ mode, id }: ResourceFormProps) {
                 ref={fileInputRef}
                 type="file"
                 multiple
+                accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
                 onChange={handleFileChange}
                 className="hidden"
               />

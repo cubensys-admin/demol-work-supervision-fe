@@ -756,6 +756,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
                 ref={completionAttachmentInputRef}
                 type="file"
                 multiple
+                accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
                 hidden
                 onChange={(event) => {
                   const files = Array.from(event.target.files ?? []);

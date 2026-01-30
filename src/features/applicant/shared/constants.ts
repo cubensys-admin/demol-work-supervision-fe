@@ -43,7 +43,7 @@ export const APPLICANT_GENDER_OPTIONS: { value: ApplicantGender; label: string }
 
 export const APPLICANT_SPECIALTY_OPTIONS: { value: string; label: string }[] = [
   { value: "건축사사무소", label: "건축사사무소" },
-  { value: "건설기술영업", label: "건설기술영업" },
+  { value: "건설엔지니어링사업자", label: "건설엔지니어링사업자" },
 ];
 
 export const APPLICANT_BUSINESS_TYPE_OPTIONS: {
@@ -60,15 +60,26 @@ export const APPLICANT_GRADE_LEVEL_OPTIONS: { value: GradeLevel; label: string }
   { value: "3등급", label: "3등급 (면적 3,000㎡ 이상 · 높이 25m 이상)" },
 ];
 
+// 첨부파일 표시 순서
+export const ATTACHMENT_DISPLAY_ORDER: ApplicantAttachmentUploadKey[] = [
+  "applicationForm",
+  "serviceRegistrationCertificate",
+  "businessRegistrationCertificate",
+  "administrativeSanctionCheck",
+  "consentForm",
+  "supervisorEducationCertificate",
+  "technicianEducationCertificate",
+];
+
 export const APPLICANT_ATTACHMENT_LABELS: Record<
   ApplicantAttachmentUploadKey,
   { label: string; required: boolean }
 > = {
   applicationForm: { label: "해체공사감리업무 등재신청서", required: true },
-  consentForm: { label: "해체공사감리업무 수행 동의서", required: true },
   serviceRegistrationCertificate: { label: "개설신고확인증(건설기술용역업 등록증)", required: true },
   businessRegistrationCertificate: { label: "사업자등록증", required: true },
   administrativeSanctionCheck: { label: "행정처분 조회서", required: true },
+  consentForm: { label: "해체공사감리업무 수행 동의서", required: true },
   supervisorEducationCertificate: { label: "감리자 교육 이수증", required: false },
   technicianEducationCertificate: { label: "감리원 또는 기술인력 교육 이수증", required: false },
 };

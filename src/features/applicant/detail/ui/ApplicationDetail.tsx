@@ -9,10 +9,13 @@ import {
 import { formatDate } from "@/shared/lib/date";
 import { Button } from "@/shared/ui/button";
 import {
+  APPLICANT_ATTACHMENT_LABELS,
   APPLICANT_BUSINESS_TYPE_OPTIONS,
   APPLICANT_GENDER_OPTIONS,
   APPLICANT_GRADE_LEVEL_OPTIONS,
   APPLICANT_PROBLEM_FIELD_LABELS,
+  ATTACHMENT_DISPLAY_ORDER,
+  ATTACHMENT_TYPE_TO_KEY,
 } from "@/features/applicant/shared/constants";
 
 interface ApplicationDetailProps {
@@ -32,11 +35,17 @@ const genderLabelMap = Object.fromEntries(
 ) as Record<ApplicantGender, string>;
 
 function AttachmentItem({ attachment }: { attachment: ApplicantAttachment }) {
+  const attachmentKey = attachment.type ? ATTACHMENT_TYPE_TO_KEY[attachment.type] : undefined;
+  const label =
+    attachmentKey && attachmentKey !== 'careerCertificates'
+      ? APPLICANT_ATTACHMENT_LABELS[attachmentKey]?.label
+      : attachment.type;
+
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border border-border-light px-4 py-3 text-sm">
       <div>
-        <p className="font-medium text-heading">{attachment.originalFilename}</p>
-        <p className="text-xs text-secondary">유형: {attachment.type}</p>
+        <p className="font-medium text-heading">{label ?? attachment.type}</p>
+        <p className="text-xs text-secondary">{attachment.originalFilename}</p>
       </div>
       {attachment.downloadUrl && (
         <a
@@ -226,9 +235,17 @@ export function ApplicationDetail({ application }: ApplicationDetailProps) {
         <h2 className="text-xl font-semibold text-heading">첨부파일</h2>
         {application.attachments && application.attachments.length > 0 ? (
           <ul className="mt-4 space-y-3">
-            {application.attachments.map((attachment) => (
-              <AttachmentItem key={attachment.id} attachment={attachment} />
-            ))}
+            {[...application.attachments]
+              .sort((a, b) => {
+                const keyA = a.type ? ATTACHMENT_TYPE_TO_KEY[a.type] : undefined;
+                const keyB = b.type ? ATTACHMENT_TYPE_TO_KEY[b.type] : undefined;
+                const indexA = keyA && keyA !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyA as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                const indexB = keyB && keyB !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyB as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                return indexA - indexB;
+              })
+              .map((attachment) => (
+                <AttachmentItem key={attachment.id} attachment={attachment} />
+              ))}
           </ul>
         ) : (
           <p className="mt-4 text-sm text-secondary">등록된 첨부파일이 없습니다.</p>

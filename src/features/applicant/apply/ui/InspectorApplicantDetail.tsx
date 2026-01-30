@@ -16,6 +16,7 @@ import {
   APPLICANT_GENDER_OPTIONS,
   APPLICANT_GRADE_LEVEL_OPTIONS,
   ATTACHMENT_TYPE_TO_KEY,
+  ATTACHMENT_DISPLAY_ORDER,
 } from '@/features/applicant/shared/constants';
 import { formatDate } from '@/shared/lib/date';
 import { Button } from '@/shared/ui/button';
@@ -247,36 +248,44 @@ export function InspectorApplicantDetail({ application }: InspectorApplicantDeta
         <h2 className="text-xl font-semibold text-heading">첨부파일</h2>
         {application.attachments && application.attachments.length > 0 ? (
           <ul className="mt-4 space-y-3 text-sm text-secondary">
-            {application.attachments.map((attachment) => {
-              const attachmentKey = attachment.type
-                ? ATTACHMENT_TYPE_TO_KEY[attachment.type]
-                : undefined;
-              const label =
-                attachmentKey && attachmentKey !== 'careerCertificates'
-                  ? APPLICANT_ATTACHMENT_LABELS[attachmentKey]?.label
-                  : attachment.type;
-              return (
-                <li key={attachment.id} className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-heading">{label ?? attachment.type}</span>
-                  <div className="flex items-center gap-3">
-                    {attachment.originalFilename && (
-                      <span className="text-xs text-gray-500">{attachment.originalFilename}</span>
-                    )}
-                    {attachment.id ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDownload(attachment.id, attachment.originalFilename)}
-                        className="text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        다운로드
-                      </button>
-                    ) : (
-                      <span>-</span>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+            {[...application.attachments]
+              .sort((a, b) => {
+                const keyA = a.type ? ATTACHMENT_TYPE_TO_KEY[a.type] : undefined;
+                const keyB = b.type ? ATTACHMENT_TYPE_TO_KEY[b.type] : undefined;
+                const indexA = keyA && keyA !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyA as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                const indexB = keyB && keyB !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyB as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                return indexA - indexB;
+              })
+              .map((attachment) => {
+                const attachmentKey = attachment.type
+                  ? ATTACHMENT_TYPE_TO_KEY[attachment.type]
+                  : undefined;
+                const label =
+                  attachmentKey && attachmentKey !== 'careerCertificates'
+                    ? APPLICANT_ATTACHMENT_LABELS[attachmentKey]?.label
+                    : attachment.type;
+                return (
+                  <li key={attachment.id} className="flex items-center justify-between gap-4">
+                    <span className="font-medium text-heading">{label ?? attachment.type}</span>
+                    <div className="flex items-center gap-3">
+                      {attachment.originalFilename && (
+                        <span className="text-xs text-gray-500">{attachment.originalFilename}</span>
+                      )}
+                      {attachment.id ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(attachment.id, attachment.originalFilename)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          다운로드
+                        </button>
+                      ) : (
+                        <span>-</span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
           </ul>
         ) : (
           <p className="mt-4 text-sm text-secondary">첨부파일이 없습니다.</p>

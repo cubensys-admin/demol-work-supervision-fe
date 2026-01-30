@@ -35,6 +35,7 @@ import {
   APPLICANT_PROBLEM_FIELD_LABELS,
   APPLICANT_ATTACHMENT_LABELS,
   ATTACHMENT_KEY_TO_TYPE,
+  ATTACHMENT_DISPLAY_ORDER,
 } from "@/features/applicant/shared/constants";
 import { formatDate } from "@/shared/lib/date";
 import { Button } from "@/shared/ui/button";
@@ -665,9 +666,7 @@ export function ApplicantManagement() {
     });
 
     const renderAttachments = () => {
-      const attachmentKeys = Object.keys(
-        APPLICANT_ATTACHMENT_LABELS,
-      ) as (keyof typeof ATTACHMENT_KEY_TO_TYPE)[];
+      const attachmentKeys = ATTACHMENT_DISPLAY_ORDER as (keyof typeof ATTACHMENT_KEY_TO_TYPE)[];
 
       return (
         <ul className="space-y-3">

@@ -266,6 +266,7 @@ export function NoticeForm({ mode, id }: NoticeFormProps) {
                 ref={fileInputRef}
                 type="file"
                 multiple
+                accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
                 onChange={handleFileChange}
                 className="hidden"
               />
