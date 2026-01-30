@@ -975,17 +975,6 @@ export function DemolitionRequestForm() {
               </Select>
             </label>
 
-            <label className="flex items-center gap-2 text-sm font-medium text-heading">
-              <input
-                type="checkbox"
-                name="undergroundWork"
-                checked={Boolean(formData.undergroundWork)}
-                onChange={handleChange}
-                className="h-4 w-4 rounded border border-border-light"
-              />
-              지하층 해체작업 포함(삭제확인필요)
-            </label>
-
             <div className="flex flex-col gap-2 text-sm font-medium text-heading">
               <span className="flex items-center gap-1">
                 신청 구분 <span className="text-red-500">*</span>

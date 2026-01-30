@@ -887,7 +887,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
         </div>
       )}
 
-      {completionReport && (
+      {completionReport && request.status === 'SUPERVISOR_COMPLETED' && (
         <div className="rounded-[20px] bg-white px-8 py-6 shadow-[2px_4px_20px_rgba(0,0,0,0.05)]">
           <h2 className="text-xl font-semibold mb-4">제출된 감리 완료 보고</h2>
 
