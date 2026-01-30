@@ -32,6 +32,7 @@ const GRADE_LEVEL_LABEL_MAP = Object.fromEntries(
 interface CompletionFormState {
   supervisionFee: string;
   paymentAmount: string;
+  vatIncluded: boolean;
   paymentCompleted: boolean;
   paymentCompletedAt: string;
   contractAmount: string;
@@ -42,6 +43,7 @@ interface CompletionFormState {
 const INITIAL_COMPLETION_FORM: CompletionFormState = {
   supervisionFee: '',
   paymentAmount: '',
+  vatIncluded: false,
   paymentCompleted: false,
   paymentCompletedAt: '',
   contractAmount: '',
@@ -77,14 +79,20 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const [completionAttachments, setCompletionAttachments] = useState<File[]>([]);
   const completionAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const [contractFile, setContractFile] = useState<File | null>(null);
+  const contractFileInputRef = useRef<HTMLInputElement | null>(null);
   const [isEditingSettlement, setIsEditingSettlement] = useState(false);
 
   useEffect(() => {
     setCompletionForm(INITIAL_COMPLETION_FORM);
     setCompletionAttachments([]);
+    setContractFile(null);
     setIsEditingSettlement(false);
     if (completionAttachmentInputRef.current) {
       completionAttachmentInputRef.current.value = '';
+    }
+    if (contractFileInputRef.current) {
+      contractFileInputRef.current.value = '';
     }
   }, [request.id]);
 
@@ -93,6 +101,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
       setCompletionForm({
         supervisionFee: completionReport.supervisionFee?.toString() ?? '',
         paymentAmount: completionReport.paymentAmount?.toString() ?? '',
+        vatIncluded: false,
         paymentCompleted: completionReport.paymentCompleted ?? false,
         paymentCompletedAt: completionReport.paymentCompletedAt
           ? new Date(completionReport.paymentCompletedAt).toISOString().slice(0, 16)
@@ -390,19 +399,19 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
     };
 
     if (!hasPositiveNumber(completionForm.supervisionFee)) {
-      toast.error('감리 수수료를 입력해주세요.');
+      toast.error('해체감리비를 입력해주세요.');
       return;
     }
     if (!hasPositiveNumber(completionForm.paymentAmount)) {
-      toast.error('입금 금액을 입력해주세요.');
+      toast.error('계약금액을 입력해주세요.');
       return;
     }
     if (!hasPositiveNumber(completionForm.contractAmount)) {
-      toast.error('계약 금액을 입력해주세요.');
+      toast.error('실적회비 수수료를 입력해주세요.');
       return;
     }
     if (!hasPositiveNumber(completionForm.associationFee)) {
-      toast.error('건축사회 수수료를 입력해주세요.');
+      toast.error('결제입금액을 입력해주세요.');
       return;
     }
     if (completionForm.contractorName.trim().length === 0) {
@@ -438,8 +447,8 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
   };
 
   const handleSubmitCompletion = async () => {
-    if (!completionReport) {
-      toast.error('실적회비를 먼저 납부해주세요.');
+    if (!completionReport || !completionReport.settled) {
+      toast.error('실적회비 납부 후 감리 완료보고서를 제출하실 수 있습니다.');
       return;
     }
 
@@ -530,7 +539,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
                 <p className="text-lg font-semibold text-amber-600">미납</p>
               )}
               {isInspector && (
-                <p className="mt-2 text-sm text-secondary">
+                <p className="mt-2 text-sm font-medium text-gray-700">
                   실적회비 납부 후 감리 완료보고서를 제출 하실 수 있습니다.
                 </p>
               )}
@@ -538,7 +547,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
           )}
 
           {isInspector && completionReport && !completionReport.settled && (
-            <p className="text-sm text-secondary mb-6">
+            <p className="text-sm font-medium text-gray-700 mb-6">
               실적회비 납부 후 감리 완료보고서를 제출 하실 수 있습니다.
             </p>
           )}
@@ -547,7 +556,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="flex flex-col gap-2 text-sm font-medium text-heading">
-                  감리 수수료 (원)
+                  해체감리비
                   <Input
                     type="number"
                     min="0"
@@ -563,8 +572,24 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
                     required
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-sm font-medium text-heading">
-                  입금 금액 (원)
+                <div className="flex flex-col gap-2 text-sm font-medium text-heading">
+                  <div className="flex items-center gap-3">
+                    <span>계약금액</span>
+                    <label className="flex items-center gap-1.5 text-sm font-normal">
+                      <input
+                        type="checkbox"
+                        checked={completionForm.vatIncluded}
+                        onChange={(event) =>
+                          setCompletionForm((prev) => ({
+                            ...prev,
+                            vatIncluded: event.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <span className="text-gray-600">부가세포함</span>
+                    </label>
+                  </div>
                   <Input
                     type="number"
                     min="0"
@@ -579,9 +604,16 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
                     placeholder="예: 800000"
                     required
                   />
-                </label>
+                  {completionForm.paymentAmount && (
+                    <span className="text-xs text-gray-500">
+                      {completionForm.vatIncluded
+                        ? `부가세 포함 금액: ${Number(completionForm.paymentAmount).toLocaleString()}원`
+                        : `부가세 별도 (VAT 10% 추가 시: ${Math.round(Number(completionForm.paymentAmount) * 1.1).toLocaleString()}원)`}
+                    </span>
+                  )}
+                </div>
                 <label className="flex flex-col gap-2 text-sm font-medium text-heading">
-                  계약 금액 (원)
+                  실적회비 수수료
                   <Input
                     type="number"
                     min="0"
@@ -598,7 +630,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-sm font-medium text-heading">
-                  건축사회 수수료 (원)
+                  결제입금액
                   <Input
                     type="number"
                     min="0"
@@ -634,6 +666,54 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
                   />
                 </label>
 
+                <div className="flex flex-col gap-2 text-sm font-medium text-heading">
+                  <span>계약서 첨부</span>
+                  <input
+                    ref={contractFileInputRef}
+                    type="file"
+                    accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setContractFile(file);
+                    }}
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => contractFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                    >
+                      <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      파일 선택
+                    </button>
+                    {contractFile && (
+                      <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-1.5">
+                        <span className="text-sm text-blue-700 truncate max-w-[200px]">{contractFile.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setContractFile(null);
+                            if (contractFileInputRef.current) {
+                              contractFileInputRef.current.value = '';
+                            }
+                          }}
+                          className="text-gray-400 hover:text-red-500"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 font-normal">PDF, HWP, Word, JPG, PNG 형식 업로드 가능</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-2 text-sm font-medium text-heading">
                   <label className="flex items-center gap-2">
                     <input
@@ -692,19 +772,19 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
             <div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium text-secondary">감리 수수료 (원)</label>
+                  <label className="text-sm font-medium text-secondary">해체감리비</label>
                   <p className="mt-1 text-heading">{formatCurrency(completionReport.supervisionFee)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-secondary">입금 금액 (원)</label>
+                  <label className="text-sm font-medium text-secondary">계약금액</label>
                   <p className="mt-1 text-heading">{formatCurrency(completionReport.paymentAmount)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-secondary">계약 금액 (원)</label>
+                  <label className="text-sm font-medium text-secondary">실적회비 수수료</label>
                   <p className="mt-1 text-heading">{formatCurrency(completionReport.contractAmount)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-secondary">건축사회 수수료 (원)</label>
+                  <label className="text-sm font-medium text-secondary">결제입금액</label>
                   <p className="mt-1 text-heading">{formatCurrency(completionReport.associationFee)}</p>
                 </div>
                 <div>
@@ -799,7 +879,7 @@ export function DemolitionRequestDetail({ request, onRefresh }: DemolitionReques
             <Button
               type="button"
               onClick={handleSubmitCompletion}
-              disabled={!completionReport || completionAttachments.length === 0 || isSubmittingCompletion}
+              disabled={isSubmittingCompletion}
             >
               {isSubmittingCompletion ? '제출 중...' : '감리 완료 제출'}
             </Button>

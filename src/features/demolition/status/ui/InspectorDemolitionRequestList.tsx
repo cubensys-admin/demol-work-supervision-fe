@@ -10,38 +10,23 @@ import type {
   DemolitionRequestStatus,
   DemolitionRequestSummary,
 } from '@/entities/demolition/model/types';
-import { getInspectorDemolitionStatusLabel, getDemolitionStatusBadge, getDemolitionTypeLabel } from '@/entities/demolition/model/status';
+import { getInspectorDemolitionStatusLabel, getDemolitionStatusBadge } from '@/entities/demolition/model/status';
 import { formatDate } from '@/shared/lib/date';
 import { Button } from '@/shared/ui/button';
 import { TextField } from '@/shared/ui/text-field';
 import { Select } from '@/shared/ui/select';
 import { Pagination } from '@/shared/ui/pagination';
 
-const SEOUL_DISTRICTS = [
-  '강남구', '강동구', '강북구', '강서구', '관악구',
-  '광진구', '구로구', '금천구', '노원구', '도봉구',
-  '동대문구', '동작구', '마포구', '서대문구', '서초구',
-  '성동구', '성북구', '송파구', '양천구', '영등포구',
-  '용산구', '은평구', '종로구', '중구', '중랑구',
-] as const;
-
-const ZONE_OPTIONS = ['ALL', '서북권', '동북권', '동남권', '서남권'] as const;
-
-const ZONE_DISTRICTS: Record<string, readonly string[]> = {
-  ALL: SEOUL_DISTRICTS,
-  서북권: ['종로구', '중구', '용산구', '은평구', '서대문구', '마포구'],
-  동북권: ['성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구'],
-  동남권: ['서초구', '강남구', '송파구', '강동구'],
-  서남권: ['양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구'],
-};
-
 type AppliedFilters = {
   status?: DemolitionRequestStatus;
-  region?: string;
-  zone?: string;
   fromDate?: string;
   toDate?: string;
+  periodNumber?: string;
+  ownerName?: string;
+  siteAddress?: string;
 };
+
+type SearchFieldType = 'periodNumber' | 'ownerName' | 'siteAddress';
 
 /**
  * Inspector Demolition Request List
@@ -56,10 +41,10 @@ export function InspectorDemolitionRequestList() {
   const [totalElements, setTotalElements] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<'ALL' | DemolitionRequestStatus>('ALL');
-  const [regionFilter, setRegionFilter] = useState<'ALL' | (typeof SEOUL_DISTRICTS)[number]>('ALL');
-  const [zoneFilter, setZoneFilter] = useState<(typeof ZONE_OPTIONS)[number]>('ALL');
   const [fromDateFilter, setFromDateFilter] = useState('');
   const [toDateFilter, setToDateFilter] = useState('');
+  const [searchFieldType, setSearchFieldType] = useState<SearchFieldType>('periodNumber');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({});
   const [isFilterExpanded, setIsFilterExpanded] = useState(true);
 
@@ -79,10 +64,6 @@ export function InspectorDemolitionRequestList() {
     [],
   );
 
-  const availableDistricts = useMemo(() => {
-    return ZONE_DISTRICTS[zoneFilter] || SEOUL_DISTRICTS;
-  }, [zoneFilter]);
-
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -90,10 +71,11 @@ export function InspectorDemolitionRequestList() {
         page: currentPage,
         size: pageSize,
         status: appliedFilters.status,
-        region: appliedFilters.region,
-        zone: appliedFilters.zone,
         fromDate: appliedFilters.fromDate,
         toDate: appliedFilters.toDate,
+        periodNumber: appliedFilters.periodNumber ? Number(appliedFilters.periodNumber) : undefined,
+        ownerName: appliedFilters.ownerName,
+        siteAddress: appliedFilters.siteAddress,
       });
       setRequests(response.content);
       setTotalPages(response.totalPages);
@@ -110,31 +92,29 @@ export function InspectorDemolitionRequestList() {
     loadRequests();
   }, [loadRequests]);
 
-  useEffect(() => {
-    // 권역이 변경되면 지역 필터를 초기화 (현재 선택된 지역이 새 권역에 없으면)
-    if (regionFilter !== 'ALL' && !availableDistricts.includes(regionFilter)) {
-      setRegionFilter('ALL');
-    }
-  }, [zoneFilter, regionFilter, availableDistricts]);
-
   const handleApplyFilters = (event: FormEvent) => {
     event.preventDefault();
-    setAppliedFilters({
+    const filters: AppliedFilters = {
       status: statusFilter === 'ALL' ? undefined : statusFilter,
-      region: regionFilter === 'ALL' ? undefined : regionFilter,
-      zone: zoneFilter === 'ALL' ? undefined : zoneFilter,
       fromDate: fromDateFilter || undefined,
       toDate: toDateFilter || undefined,
-    });
+    };
+
+    // Apply search keyword to the selected field type
+    if (searchKeyword) {
+      filters[searchFieldType] = searchKeyword;
+    }
+
+    setAppliedFilters(filters);
     setCurrentPage(0);
   };
 
   const handleReset = () => {
     setStatusFilter('ALL');
-    setRegionFilter('ALL');
-    setZoneFilter('ALL');
     setFromDateFilter('');
     setToDateFilter('');
+    setSearchFieldType('periodNumber');
+    setSearchKeyword('');
     setAppliedFilters({});
     setCurrentPage(0);
   };
@@ -181,85 +161,77 @@ export function InspectorDemolitionRequestList() {
       >
         <form onSubmit={handleApplyFilters} className="bg-white">
         <div className="flex flex-col">
-          {/* First Row: 기간 (날짜 범위) */}
-          <div className="flex items-center gap-3" style={{ borderTop: '1px solid #D2D2D2' }}>
+          {/* First Row: 기간 | 상태 */}
+          <div className="flex items-center" style={{ borderTop: '1px solid #D2D2D2' }}>
             <label htmlFor="fromDateFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
               기간
             </label>
-            <TextField
-              id="fromDateFilter"
-              type="date"
-              placeholder="시작일"
-              value={fromDateFilter}
-              onChange={(e) => setFromDateFilter(e.target.value)}
-              className="w-[160px]"
-              style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
-            />
-            <span className="text-[14px] text-[#646F7C]">~</span>
-            <TextField
-              id="toDateFilter"
-              type="date"
-              placeholder="종료일"
-              value={toDateFilter}
-              onChange={(e) => setToDateFilter(e.target.value)}
-              className="w-[160px]"
-              style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
-            />
-          </div>
+            <div className="flex items-center gap-2 px-3">
+              <TextField
+                id="fromDateFilter"
+                type="date"
+                placeholder="시작일"
+                value={fromDateFilter}
+                onChange={(e) => setFromDateFilter(e.target.value)}
+                className="w-[160px]"
+                style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
+              />
+              <span className="text-[14px] text-[#646F7C]">~</span>
+              <TextField
+                id="toDateFilter"
+                type="date"
+                placeholder="종료일"
+                value={toDateFilter}
+                onChange={(e) => setToDateFilter(e.target.value)}
+                className="w-[160px]"
+                style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
+              />
+            </div>
 
-          {/* Second Row: 상태 | 권역 | 지역 | 조회 | 초기화 */}
-          <div className="flex items-center gap-3" style={{ borderTop: '1px solid #D2D2D2', borderBottom: '1px solid #D2D2D2' }}>
             <label htmlFor="statusFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
               상태
             </label>
-            <Select
-              id="statusFilter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              className="flex-1"
-              style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
-            >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+            <div className="px-3">
+              <Select
+                id="statusFilter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                className="w-[200px]"
+                style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
 
-            <label htmlFor="zoneFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-              권역
+          {/* Second Row: 검색 (셀렉트) | 검색어 입력 | 조회 | 초기화 */}
+          <div className="flex items-center gap-3" style={{ borderTop: '1px solid #D2D2D2', borderBottom: '1px solid #D2D2D2' }}>
+            <label htmlFor="searchFieldType" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              검색
             </label>
             <Select
-              id="zoneFilter"
-              value={zoneFilter}
-              onChange={(e) => setZoneFilter(e.target.value as typeof zoneFilter)}
-              className="flex-1"
+              id="searchFieldType"
+              value={searchFieldType}
+              onChange={(e) => setSearchFieldType(e.target.value as SearchFieldType)}
+              className="w-[180px]"
               style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
             >
-              {ZONE_OPTIONS.map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone === 'ALL' ? '전체 권역' : zone}
-                </option>
-              ))}
+              <option value="periodNumber">기수</option>
+              <option value="ownerName">건축주</option>
+              <option value="siteAddress">건축위치</option>
             </Select>
 
-            <label htmlFor="regionFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-              지역
-            </label>
-            <Select
-              id="regionFilter"
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value as typeof regionFilter)}
+            <TextField
+              placeholder="검색어를 입력하세요"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1"
               style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
-            >
-              <option value="ALL">전체 지역</option>
-              {availableDistricts.map((district) => (
-                <option key={district} value={district}>
-                  {district}
-                </option>
-              ))}
-            </Select>
+            />
 
             <Button type="submit" className="w-[100px] text-[14px] font-medium leading-[1.4] tracking-[-0.28px] text-white" style={{ height: '36px' }}>
               조회
@@ -353,21 +325,20 @@ export function InspectorDemolitionRequestList() {
             <caption className="sr-only">감리 작업 현황 목록</caption>
             <thead className="bg-[#EDF6FF]">
               <tr className="h-12">
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">No.</th>
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">주소</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '60px' }}>NO</th>
                 <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '65px' }}>기수</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>요청일</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '90px' }}>요청타입</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '90px' }}>구청</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '80px' }}>지역</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '80px' }}>권역</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>상태</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '120px' }}>접수번호</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>건축주</th>
+                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">건축위치</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>규모</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>추천일자</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>진행상태</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-neutral/70 text-[14px] text-heading">
               {isLoading && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-secondary">
+                  <td colSpan={8} className="px-4 py-12 text-center text-secondary">
                     불러오는 중...
                   </td>
                 </tr>
@@ -375,7 +346,7 @@ export function InspectorDemolitionRequestList() {
 
               {!isLoading && requests.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-secondary">
+                  <td colSpan={8} className="px-4 py-12 text-center text-secondary">
                     조회된 요청이 없습니다.
                   </td>
                 </tr>
@@ -388,31 +359,28 @@ export function InspectorDemolitionRequestList() {
                     onClick={() => handleRowClick(request.id)}
                     className="bg-white hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="px-5 py-4 align-middle text-left text-secondary">
+                    <td className="px-5 py-4 align-middle text-center text-secondary">
                       {request.id}
-                    </td>
-                    <td className="px-5 py-4 align-middle text-left">
-                      <span className="text-[15px] font-semibold text-heading">
-                        {request.siteDetailAddress || '-'}
-                      </span>
                     </td>
                     <td className="px-5 py-4 align-middle text-center text-secondary">
                       {request.periodNumber ? `${request.periodNumber}기` : '-'}
                     </td>
                     <td className="px-5 py-4 align-middle text-center text-secondary">
-                      {formatDate(request.requestDate)}
+                      {request.requestNumber || '-'}
                     </td>
                     <td className="px-5 py-4 align-middle text-center">
-                      {getDemolitionTypeLabel(request.requestType)}
+                      -
+                    </td>
+                    <td className="px-5 py-4 align-middle text-left">
+                      <span className="text-[15px] font-semibold text-heading">
+                        {request.siteAddress || request.siteDetailAddress || '-'}
+                      </span>
                     </td>
                     <td className="px-5 py-4 align-middle text-center">
-                      {request.districtOffice || '-'}
+                      -
                     </td>
-                    <td className="px-5 py-4 align-middle text-center">
-                      {request.region || '-'}
-                    </td>
-                    <td className="px-5 py-4 align-middle text-center">
-                      {request.zone || '-'}
+                    <td className="px-5 py-4 align-middle text-center text-secondary">
+                      {formatDate(request.designationDate || request.supervisorAssignedAt)}
                     </td>
                     <td className="px-5 py-4 align-middle text-center">
                       <span className={getDemolitionStatusBadge(request.status)} style={{ display: 'inline-block', width: '88px', textAlign: 'center', padding: '8px 12px', borderRadius: '4px' }}>

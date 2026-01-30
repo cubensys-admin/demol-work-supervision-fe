@@ -99,6 +99,8 @@ export async function getInspectorDemolitionRequests(
     region?: string;
     zone?: string;
     periodNumber?: number;
+    ownerName?: string;
+    siteAddress?: string;
     fromDate?: string; // YYYY-MM-DD
     toDate?: string;   // YYYY-MM-DD
     page?: number;
