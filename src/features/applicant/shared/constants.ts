@@ -60,7 +60,7 @@ export const APPLICANT_GRADE_LEVEL_OPTIONS: { value: GradeLevel; label: string }
   { value: "3등급", label: "3등급 (면적 3,000㎡ 이상 · 높이 25m 이상)" },
 ];
 
-// 첨부파일 표시 순서
+// 첨부파일 표시 순서 (technicianEducationCertificate는 기술인력 수에 따라 동적 렌더링)
 export const ATTACHMENT_DISPLAY_ORDER: ApplicantAttachmentUploadKey[] = [
   "applicationForm",
   "serviceRegistrationCertificate",
@@ -68,7 +68,6 @@ export const ATTACHMENT_DISPLAY_ORDER: ApplicantAttachmentUploadKey[] = [
   "administrativeSanctionCheck",
   "consentForm",
   "supervisorEducationCertificate",
-  "technicianEducationCertificate",
 ];
 
 export const APPLICANT_ATTACHMENT_LABELS: Record<

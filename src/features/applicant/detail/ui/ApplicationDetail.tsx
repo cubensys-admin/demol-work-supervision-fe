@@ -34,17 +34,24 @@ const genderLabelMap = Object.fromEntries(
   APPLICANT_GENDER_OPTIONS.map(({ value, label }) => [value, label]),
 ) as Record<ApplicantGender, string>;
 
-function AttachmentItem({ attachment }: { attachment: ApplicantAttachment }) {
-  const attachmentKey = attachment.type ? ATTACHMENT_TYPE_TO_KEY[attachment.type] : undefined;
-  const label =
-    attachmentKey && attachmentKey !== 'careerCertificates'
-      ? APPLICANT_ATTACHMENT_LABELS[attachmentKey]?.label
-      : attachment.type;
+const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
+  APPLICATION_FORM: '해체공사감리업무 등재신청서',
+  CONSENT_FORM: '해체공사감리업무 수행 동의서',
+  SERVICE_REGISTRATION_CERTIFICATE: '개설신고확인증(건설기술용역업 등록증)',
+  BUSINESS_REGISTRATION_CERTIFICATE: '사업자등록증',
+  ADMINISTRATIVE_SANCTION_CHECK: '행정처분 조회서',
+  SUPERVISOR_EDUCATION_CERTIFICATE: '감리자 교육 이수증',
+  TECHNICIAN_EDUCATION_CERTIFICATE: '감리원 또는 기술인력 교육 이수증',
+  CAREER_CERTIFICATE: '경력증명서',
+};
+
+function AttachmentItem({ attachment, label: overrideLabel }: { attachment: ApplicantAttachment; label?: string }) {
+  const label = overrideLabel ?? ATTACHMENT_TYPE_LABELS[attachment.type] ?? attachment.type;
 
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border border-border-light px-4 py-3 text-sm">
       <div>
-        <p className="font-medium text-heading">{label ?? attachment.type}</p>
+        <p className="font-medium text-heading">{label}</p>
         <p className="text-xs text-secondary">{attachment.originalFilename}</p>
       </div>
       {attachment.downloadUrl && (

@@ -75,6 +75,7 @@ const defaultTechnicalPersonnelRow: TechnicalPersonnelRow = {
 };
 
 const initialCareerCertificateState: (File | null)[] = [null];
+const initialTechEdCertificateState: (File | null)[] = [null];
 
 const initialFormState: ApplyFormState = {
   periodNumber: '',
@@ -115,6 +116,7 @@ export function InspectorApplicationForm() {
     ...initialAttachmentsState,
   });
   const [careerCertificates, setCareerCertificates] = useState<(File | null)[]>([...initialCareerCertificateState]);
+  const [techEdCertificates, setTechEdCertificates] = useState<(File | null)[]>([...initialTechEdCertificateState]);
   const [zoneChangeAttachments, setZoneChangeAttachments] = useState<File[]>([]);
   const [hasAgreedToPolicies, setHasAgreedToPolicies] = useState(false);
   const [activeRecruitments, setActiveRecruitments] = useState<Recruitment[]>([]);
@@ -128,9 +130,10 @@ export function InspectorApplicationForm() {
     options?: {
       excludeAttachmentKey?: ApplicantAttachmentUploadKey;
       excludeCareerIndex?: number;
+      excludeTechEdIndex?: number;
     }
   ) => {
-    const { excludeAttachmentKey, excludeCareerIndex } = options ?? {};
+    const { excludeAttachmentKey, excludeCareerIndex, excludeTechEdIndex } = options ?? {};
 
     // 필수 첨부파일에서 중복 체크
     const attachmentFilenames = Object.entries(attachments)
@@ -142,12 +145,17 @@ export function InspectorApplicationForm() {
       .filter((file, index): file is File => file !== null && index !== excludeCareerIndex)
       .map((file) => file.name);
 
+    // 기술인력 교육 이수증에서 중복 체크
+    const techEdFilenames = techEdCertificates
+      .filter((file, index): file is File => file !== null && index !== excludeTechEdIndex)
+      .map((file) => file.name);
+
     // 권역변경 첨부파일에서 중복 체크
     const zoneChangeFilenames = zoneChangeAttachments.map((file) => file.name);
 
-    const allFilenames = [...attachmentFilenames, ...careerFilenames, ...zoneChangeFilenames];
+    const allFilenames = [...attachmentFilenames, ...careerFilenames, ...techEdFilenames, ...zoneChangeFilenames];
     return allFilenames.includes(filename);
-  }, [attachments, careerCertificates, zoneChangeAttachments]);
+  }, [attachments, careerCertificates, techEdCertificates, zoneChangeAttachments]);
 
   // 첨부파일 변경 핸들러 (중복 체크 포함)
   const handleAttachmentChange = useCallback((key: ApplicantAttachmentUploadKey, file: File | null) => {
@@ -225,6 +233,7 @@ export function InspectorApplicationForm() {
     });
     setAttachments({ ...initialAttachmentsState });
     setCareerCertificates([...initialCareerCertificateState]);
+    setTechEdCertificates([...initialTechEdCertificateState]);
     setZoneChangeAttachments([]);
     setHasAgreedToPolicies(false);
 
@@ -309,12 +318,25 @@ export function InspectorApplicationForm() {
     });
   };
 
+  const handleTechEdCertificateChange = (index: number, file: File | null) => {
+    if (file && isDuplicateFilename(file.name, { excludeTechEdIndex: index })) {
+      toast.error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해 주세요.');
+      return;
+    }
+    setTechEdCertificates((prev) => {
+      const next = [...prev];
+      next[index] = file;
+      return next;
+    });
+  };
+
   const addTechnicalPersonnelRow = () => {
     setForm((prev) => ({
       ...prev,
       technicalPersonnel: [...prev.technicalPersonnel, { ...defaultTechnicalPersonnelRow }],
     }));
     setCareerCertificates((prev) => [...prev, null]);
+    setTechEdCertificates((prev) => [...prev, null]);
   };
 
   const removeTechnicalPersonnelRow = (index: number) => {
@@ -336,6 +358,9 @@ export function InspectorApplicationForm() {
       };
     });
     setCareerCertificates((prev) => {
+      return prev.filter((_, rowIndex) => rowIndex !== index);
+    });
+    setTechEdCertificates((prev) => {
       return prev.filter((_, rowIndex) => rowIndex !== index);
     });
   };
@@ -409,6 +434,7 @@ export function InspectorApplicationForm() {
         technicalPersonnel: [defaultTechnicalPersonnelRow],
       }));
       setCareerCertificates([...initialCareerCertificateState]);
+      setTechEdCertificates([...initialTechEdCertificateState]);
       return;
     }
 
@@ -426,6 +452,14 @@ export function InspectorApplicationForm() {
     });
 
     setCareerCertificates((prev) => {
+      if (prev.length < minPersonnelCount) {
+        const rowsToAdd = minPersonnelCount - prev.length;
+        return [...prev, ...Array(rowsToAdd).fill(null)];
+      }
+      return prev;
+    });
+
+    setTechEdCertificates((prev) => {
       if (prev.length < minPersonnelCount) {
         const rowsToAdd = minPersonnelCount - prev.length;
         return [...prev, ...Array(rowsToAdd).fill(null)];
@@ -605,6 +639,14 @@ export function InspectorApplicationForm() {
 
     if (needsPersonnel && filledPersonnel.length > 0) {
       attachmentPayload.careerCertificates = filledPersonnel.map((row) => row.file!) as File[];
+
+      // 기술인력 교육 이수증을 technicianEducationCertificate_1, _2 등으로 추가
+      const dynamicPayload = attachmentPayload as Record<string, File | Blob | null | undefined>;
+      techEdCertificates.forEach((file, index) => {
+        if (file) {
+          dynamicPayload[`technicianEducationCertificate_${index + 1}`] = file;
+        }
+      });
     }
 
     if (form.zoneChangeRequested && zoneChangeAttachments.length > 0) {
@@ -1103,6 +1145,19 @@ export function InspectorApplicationForm() {
                   </div>
                 );
               })}
+              {requiresPersonnel && form.technicalPersonnel.map((_, index) => (
+                <div key={`techEdCert-${index}`} className="flex gap-2 justify-between">
+                  <label className="text-sm font-medium text-heading">
+                    감리원 또는 기술인력 교육 이수증 ({index + 1})
+                  </label>
+                  <FileInput
+                    value={techEdCertificates[index] ?? null}
+                    onChange={(file) => handleTechEdCertificateChange(index, file as File | null)}
+                    accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png"
+                    width="400px"
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
