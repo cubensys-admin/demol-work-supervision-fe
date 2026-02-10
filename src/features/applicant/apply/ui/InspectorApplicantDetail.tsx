@@ -10,7 +10,6 @@ import {
 } from '@/entities/applicant/model/status';
 import type { ApplicantDetail } from '@/entities/applicant/model/types';
 import {
-  APPLICANT_ATTACHMENT_LABELS,
   APPLICANT_BUSINESS_TYPE_OPTIONS,
   APPLICANT_PROBLEM_FIELD_LABELS,
   APPLICANT_GENDER_OPTIONS,
@@ -37,6 +36,16 @@ const GENDER_LABEL_MAP = Object.fromEntries(
 const SCALE_LABEL_MAP = Object.fromEntries(
   APPLICANT_GRADE_LEVEL_OPTIONS.map(({ value, label }) => [value, label]),
 ) as Record<string, string>;
+
+const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
+  APPLICATION_FORM: '해체공사감리업무 등재신청서',
+  CONSENT_FORM: '해체공사감리업무 수행 동의서',
+  SERVICE_REGISTRATION_CERTIFICATE: '개설신고확인증(건설기술용역업 등록증)',
+  BUSINESS_REGISTRATION_CERTIFICATE: '사업자등록증',
+  ADMINISTRATIVE_SANCTION_CHECK: '행정처분 조회서',
+  SUPERVISOR_EDUCATION_CERTIFICATE: '감리자 교육 이수증',
+  TECHNICIAN_EDUCATION_CERTIFICATE: '감리원 또는 기술인력 교육 이수증',
+};
 
 export function InspectorApplicantDetail({ application }: InspectorApplicantDetailProps) {
   const router = useRouter();
@@ -249,24 +258,19 @@ export function InspectorApplicantDetail({ application }: InspectorApplicantDeta
         {application.attachments && application.attachments.length > 0 ? (
           <ul className="mt-4 space-y-3 text-sm text-secondary">
             {[...application.attachments]
+              .filter((a) => a.type !== 'CAREER_CERTIFICATE')
               .sort((a, b) => {
                 const keyA = a.type ? ATTACHMENT_TYPE_TO_KEY[a.type] : undefined;
                 const keyB = b.type ? ATTACHMENT_TYPE_TO_KEY[b.type] : undefined;
-                const indexA = keyA && keyA !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyA as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
-                const indexB = keyB && keyB !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyB as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
-                return indexA - indexB;
+                const indexA = keyA ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyA as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                const indexB = keyB ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyB as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
               })
               .map((attachment) => {
-                const attachmentKey = attachment.type
-                  ? ATTACHMENT_TYPE_TO_KEY[attachment.type]
-                  : undefined;
-                const label =
-                  attachmentKey && attachmentKey !== 'careerCertificates'
-                    ? APPLICANT_ATTACHMENT_LABELS[attachmentKey]?.label
-                    : attachment.type;
+                const label = ATTACHMENT_TYPE_LABELS[attachment.type] ?? attachment.type;
                 return (
                   <li key={attachment.id} className="flex items-center justify-between gap-4">
-                    <span className="font-medium text-heading">{label ?? attachment.type}</span>
+                    <span className="font-medium text-heading">{label}</span>
                     <div className="flex items-center gap-3">
                       {attachment.originalFilename && (
                         <span className="text-xs text-gray-500">{attachment.originalFilename}</span>

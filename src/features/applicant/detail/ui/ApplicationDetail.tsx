@@ -243,12 +243,13 @@ export function ApplicationDetail({ application }: ApplicationDetailProps) {
         {application.attachments && application.attachments.length > 0 ? (
           <ul className="mt-4 space-y-3">
             {[...application.attachments]
+              .filter((a) => a.type !== 'CAREER_CERTIFICATE')
               .sort((a, b) => {
                 const keyA = a.type ? ATTACHMENT_TYPE_TO_KEY[a.type] : undefined;
                 const keyB = b.type ? ATTACHMENT_TYPE_TO_KEY[b.type] : undefined;
-                const indexA = keyA && keyA !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyA as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
-                const indexB = keyB && keyB !== 'careerCertificates' ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyB as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
-                return indexA - indexB;
+                const indexA = keyA ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyA as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                const indexB = keyB ? ATTACHMENT_DISPLAY_ORDER.indexOf(keyB as typeof ATTACHMENT_DISPLAY_ORDER[number]) : 999;
+                return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
               })
               .map((attachment) => (
                 <AttachmentItem key={attachment.id} attachment={attachment} />
