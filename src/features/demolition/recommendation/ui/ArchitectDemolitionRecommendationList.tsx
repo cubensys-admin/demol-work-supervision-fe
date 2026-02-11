@@ -432,7 +432,7 @@ export function ArchitectDemolitionRecommendationList() {
                         {getDemolitionStatusLabel(request.status)}
                       </span>
                     </td>
-                    <td className="px-5 py-4 align-middle text-right">
+                    <td className="px-5 py-4 align-middle text-right whitespace-nowrap">
                       {request.associationFee != null
                         ? `${request.associationFee.toLocaleString()}원`
                         : '-'}
