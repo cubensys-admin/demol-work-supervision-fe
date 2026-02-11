@@ -222,7 +222,7 @@ export function InspectorDemolitionRequestList() {
             >
               <option value="periodNumber">기수</option>
               <option value="ownerName">건축주</option>
-              <option value="region">건축위치(구)</option>
+              <option value="region">건축위치</option>
             </Select>
 
             <TextField
