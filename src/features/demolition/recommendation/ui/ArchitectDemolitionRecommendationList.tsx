@@ -11,7 +11,7 @@ import type {
   DemolitionRequestSummary,
   DemolitionRequestType,
 } from '@/entities/demolition/model/types';
-import { getDemolitionStatusLabel, getDemolitionStatusBadge, getDemolitionTypeLabel } from '@/entities/demolition/model/status';
+import { getDemolitionStatusLabel, getDemolitionStatusBadge } from '@/entities/demolition/model/status';
 import { formatDate } from '@/shared/lib/date';
 import { Button } from '@/shared/ui/button';
 import { TextField } from '@/shared/ui/text-field';
@@ -31,12 +31,15 @@ type AppliedFilters = {
   status?: DemolitionRequestStatus;
   requestType?: DemolitionRequestType;
   region?: string;
+  periodNumber?: string;
+  requestNumber?: string;
   ownerName?: string;
+  siteDetailAddress?: string;
   supervisorName?: string;
   supervisorLicense?: string;
 };
 
-type SearchFieldType = 'ownerName' | 'supervisorName' | 'supervisorLicense';
+type SearchFieldType = 'periodNumber' | 'requestNumber' | 'ownerName' | 'siteDetailAddress' | 'supervisorName' | 'supervisorLicense';
 
 /**
  * Architect Society Demolition Supervisor Assigned List
@@ -53,7 +56,7 @@ export function ArchitectDemolitionRecommendationList() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | DemolitionRequestStatus>('ALL');
   const [requestTypeFilter, setRequestTypeFilter] = useState<'ALL' | DemolitionRequestType>('ALL');
   const [regionFilter, setRegionFilter] = useState<'ALL' | (typeof SEOUL_DISTRICTS)[number]>('ALL');
-  const [searchFieldType, setSearchFieldType] = useState<SearchFieldType>('ownerName');
+  const [searchFieldType, setSearchFieldType] = useState<SearchFieldType>('periodNumber');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({});
   const [isFilterExpanded, setIsFilterExpanded] = useState(true);
@@ -97,7 +100,10 @@ export function ArchitectDemolitionRecommendationList() {
         status: appliedFilters.status,
         requestType: appliedFilters.requestType,
         region: appliedFilters.region,
+        periodNumber: appliedFilters.periodNumber ? Number(appliedFilters.periodNumber) : undefined,
+        requestNumber: appliedFilters.requestNumber,
         ownerName: appliedFilters.ownerName,
+        siteDetailAddress: appliedFilters.siteDetailAddress,
         supervisorName: appliedFilters.supervisorName,
         supervisorLicense: appliedFilters.supervisorLicense,
       });
@@ -137,7 +143,7 @@ export function ArchitectDemolitionRecommendationList() {
     setStatusFilter('ALL');
     setRequestTypeFilter('ALL');
     setRegionFilter('ALL');
-    setSearchFieldType('ownerName');
+    setSearchFieldType('periodNumber');
     setSearchKeyword('');
     setAppliedFilters({});
     setCurrentPage(0);
@@ -185,48 +191,44 @@ export function ArchitectDemolitionRecommendationList() {
       >
         <form onSubmit={handleApplyFilters} className="bg-white">
         <div className="flex flex-col">
-          {/* First Row: 요청유형 (라디오) | 상태 (셀렉트) | 건축위치 (셀렉트) */}
-          <div className="flex items-center gap-2" style={{ borderTop: '1px solid #D2D2D2' }}>
-            {/* Group 1: 요청유형 */}
-            <div className="flex items-center gap-3 flex-1">
-              <label className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-                요청유형
-              </label>
-              <div className="flex items-center gap-4">
-                <Radio
-                  label="전체"
-                  value="ALL"
-                  name="requestType"
-                  checked={requestTypeFilter === 'ALL'}
-                  onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
-                />
-                <Radio
-                  label="추천"
-                  value="RECOMMENDATION"
-                  name="requestType"
-                  checked={requestTypeFilter === 'RECOMMENDATION'}
-                  onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
-                />
-                <Radio
-                  label="우선지정"
-                  value="PRIORITY_DESIGNATION"
-                  name="requestType"
-                  checked={requestTypeFilter === 'PRIORITY_DESIGNATION'}
-                  onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
-                />
-              </div>
+          {/* First Row: 요청유형 | 상태 | 권역 | 지역구 */}
+          <div className="flex items-center" style={{ borderTop: '1px solid #D2D2D2' }}>
+            <label className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              요청유형
+            </label>
+            <div className="flex items-center gap-4 px-3">
+              <Radio
+                label="전체"
+                value="ALL"
+                name="requestType"
+                checked={requestTypeFilter === 'ALL'}
+                onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
+              />
+              <Radio
+                label="추천"
+                value="RECOMMENDATION"
+                name="requestType"
+                checked={requestTypeFilter === 'RECOMMENDATION'}
+                onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
+              />
+              <Radio
+                label="우선지정"
+                value="PRIORITY_DESIGNATION"
+                name="requestType"
+                checked={requestTypeFilter === 'PRIORITY_DESIGNATION'}
+                onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
+              />
             </div>
 
-            {/* Group 2: 상태 */}
-            <div className="flex items-center gap-3 flex-1">
-              <label htmlFor="statusFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-                상태
-              </label>
+            <label htmlFor="statusFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              상태
+            </label>
+            <div className="px-3">
               <Select
                 id="statusFilter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="flex-1"
+                className="w-[180px]"
                 style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
               >
                 {statusOptions.map((option) => (
@@ -237,16 +239,15 @@ export function ArchitectDemolitionRecommendationList() {
               </Select>
             </div>
 
-            {/* Group 3: 건축위치 */}
-            <div className="flex items-center gap-3 flex-1">
-              <label htmlFor="regionFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-                건축위치
-              </label>
+            <label htmlFor="regionFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              지역구
+            </label>
+            <div className="px-3">
               <Select
                 id="regionFilter"
                 value={regionFilter}
                 onChange={(e) => setRegionFilter(e.target.value as typeof regionFilter)}
-                className="flex-1"
+                className="w-[180px]"
                 style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
               >
                 <option value="ALL">전체 지역</option>
@@ -271,13 +272,16 @@ export function ArchitectDemolitionRecommendationList() {
               className="w-[180px]"
               style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
             >
+              <option value="periodNumber">기수</option>
+              <option value="requestNumber">접수번호</option>
               <option value="ownerName">건축주</option>
-              <option value="supervisorName">감리자명</option>
+              <option value="siteDetailAddress">건축위치</option>
+              <option value="supervisorName">감리자</option>
               <option value="supervisorLicense">자격번호</option>
             </Select>
 
             <TextField
-              placeholder="입력하세요"
+              placeholder="검색어를 입력하세요"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1"
@@ -319,25 +323,27 @@ export function ArchitectDemolitionRecommendationList() {
       <div className="overflow-x-auto">
         <div className="w-full overflow-hidden">
           <table className="min-w-full border-collapse text-sm">
-            <caption className="sr-only">감리자 지정 목록</caption>
+            <caption className="sr-only">해체공사감리 현황 목록</caption>
             <thead className="bg-[#EDF6FF]">
               <tr className="h-12">
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">No.</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '60px' }}>No</th>
                 <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '65px' }}>기수</th>
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">요청번호</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>요청일</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]">지정일</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '90px' }}>요청타입</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]">건축위치</th>
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">감리자</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>상태</th>
-                <th className="px-5 text-right text-[14px] font-semibold text-[#010101]">실적회비</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '120px' }}>접수번호</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>건축주</th>
+                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">건축위치</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>규모</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '110px' }}>의뢰일자</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>감리자</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '110px' }}>추천날짜</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '110px' }}>진행상태</th>
+                <th className="px-5 text-right text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>실적회비</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '80px' }}>추천회차</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-neutral/70 text-[14px] text-heading">
               {isLoading && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-secondary">
+                  <td colSpan={12} className="px-4 py-12 text-center text-secondary">
                     불러오는 중...
                   </td>
                 </tr>
@@ -345,7 +351,7 @@ export function ArchitectDemolitionRecommendationList() {
 
               {!isLoading && requests.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-secondary">
+                  <td colSpan={12} className="px-4 py-12 text-center text-secondary">
                     조회된 요청이 없습니다.
                   </td>
                 </tr>
@@ -358,31 +364,36 @@ export function ArchitectDemolitionRecommendationList() {
                     onClick={() => handleRowClick(request.id)}
                     className="bg-white hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="px-5 py-4 align-middle text-left text-secondary">
+                    <td className="px-5 py-4 align-middle text-center text-secondary">
                       {request.id}
                     </td>
                     <td className="px-5 py-4 align-middle text-center text-secondary">
                       {request.periodNumber ? `${request.periodNumber}기` : '-'}
                     </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      <span className="font-semibold text-heading">
+                        {request.requestNumber || '-'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      {request.ownerName || '-'}
+                    </td>
                     <td className="px-5 py-4 align-middle text-left">
                       <span className="text-[15px] font-semibold text-heading">
-                        {request.requestNumber}
+                        {request.siteAddress || request.siteDetailAddress || '-'}
                       </span>
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      {request.demolitionScale || '-'}
                     </td>
                     <td className="px-5 py-4 align-middle text-center text-secondary">
                       {formatDate(request.requestDate)}
                     </td>
-                    <td className="px-5 py-4 align-middle text-center text-secondary">
-                      {request.designationDate ? formatDate(request.designationDate) : '-'}
-                    </td>
                     <td className="px-5 py-4 align-middle text-center">
-                      {getDemolitionTypeLabel(request.requestType)}
-                    </td>
-                    <td className="px-5 py-4 align-middle text-center">
-                      {request.region || '-'}
-                    </td>
-                    <td className="px-5 py-4 align-middle text-left">
                       {request.supervisorName || '-'}
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center text-secondary">
+                      {formatDate(request.verificationRequestedAt)}
                     </td>
                     <td className="px-5 py-4 align-middle text-center">
                       <span className={getDemolitionStatusBadge(request.status)} style={{ display: 'inline-block', width: '88px', textAlign: 'center', padding: '8px 12px', borderRadius: '4px' }}>
@@ -393,6 +404,9 @@ export function ArchitectDemolitionRecommendationList() {
                       {request.associationFee != null
                         ? `${request.associationFee.toLocaleString()}원`
                         : '-'}
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      {request.recommendationRound ?? '-'}
                     </td>
                   </tr>
                 ))}

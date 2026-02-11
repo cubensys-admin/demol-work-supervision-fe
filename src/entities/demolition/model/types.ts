@@ -128,6 +128,8 @@ export interface DemolitionRequestSummary {
   siteAddress?: string; // 건축 위치(현장 주소)
   siteDetailAddress?: string; // 해체 위치 상세 주소
   associationFee?: number; // 실적회비
+  demolitionScale?: string; // 규모
+  recommendationRound?: number; // 추천회차
 }
 
 export interface DemolitionRequestDetail extends DemolitionRequestSummary {
