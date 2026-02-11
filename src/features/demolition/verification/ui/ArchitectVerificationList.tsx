@@ -11,13 +11,20 @@ import type {
   DemolitionRequestSummary,
   DemolitionRequestType,
 } from '@/entities/demolition/model/types';
-import { getDemolitionStatusLabel, getDemolitionStatusBadge, getDemolitionTypeLabel } from '@/entities/demolition/model/status';
+import { getDemolitionStatusLabel, getDemolitionStatusBadge } from '@/entities/demolition/model/status';
 import { formatDate } from '@/shared/lib/date';
 import { Button } from '@/shared/ui/button';
 import { TextField } from '@/shared/ui/text-field';
 import { Select } from '@/shared/ui/select';
 import { Radio } from '@/shared/ui/radio';
 import { Pagination } from '@/shared/ui/pagination';
+
+const ZONE_OPTIONS = [
+  { value: '서북권', label: '서북권', districts: ['종로구', '중구', '용산구', '은평구', '서대문구', '마포구'] },
+  { value: '동북권', label: '동북권', districts: ['성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구'] },
+  { value: '동남권', label: '동남권', districts: ['서초구', '강남구', '송파구', '강동구'] },
+  { value: '서남권', label: '서남권', districts: ['양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구'] },
+] as const;
 
 const SEOUL_DISTRICTS = [
   '강남구', '강동구', '강북구', '강서구', '관악구',
@@ -30,13 +37,17 @@ const SEOUL_DISTRICTS = [
 type AppliedFilters = {
   status?: DemolitionRequestStatus;
   requestType?: DemolitionRequestType;
+  zone?: string;
   region?: string;
+  periodNumber?: string;
+  requestNumber?: string;
   ownerName?: string;
+  siteDetailAddress?: string;
   supervisorName?: string;
   supervisorLicense?: string;
 };
 
-type SearchFieldType = 'ownerName' | 'supervisorName' | 'supervisorLicense';
+type SearchFieldType = 'periodNumber' | 'requestNumber' | 'ownerName' | 'siteDetailAddress' | 'supervisorName' | 'supervisorLicense';
 
 /**
  * Architect Society Verification List
@@ -52,8 +63,9 @@ export function ArchitectVerificationList() {
   const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<'ALL' | DemolitionRequestStatus>('VERIFICATION_REQUESTED');
   const [requestTypeFilter, setRequestTypeFilter] = useState<'ALL' | DemolitionRequestType>('ALL');
+  const [zoneFilter, setZoneFilter] = useState<'ALL' | string>('ALL');
   const [regionFilter, setRegionFilter] = useState<'ALL' | (typeof SEOUL_DISTRICTS)[number]>('ALL');
-  const [searchFieldType, setSearchFieldType] = useState<SearchFieldType>('ownerName');
+  const [searchFieldType, setSearchFieldType] = useState<SearchFieldType>('periodNumber');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({ status: 'VERIFICATION_REQUESTED' });
   const [isFilterExpanded, setIsFilterExpanded] = useState(true);
@@ -96,8 +108,12 @@ export function ArchitectVerificationList() {
         size: pageSize,
         status: appliedFilters.status,
         requestType: appliedFilters.requestType,
+        zone: appliedFilters.zone,
         region: appliedFilters.region,
+        periodNumber: appliedFilters.periodNumber ? Number(appliedFilters.periodNumber) : undefined,
+        requestNumber: appliedFilters.requestNumber,
         ownerName: appliedFilters.ownerName,
+        siteDetailAddress: appliedFilters.siteDetailAddress,
         supervisorName: appliedFilters.supervisorName,
         supervisorLicense: appliedFilters.supervisorLicense,
       });
@@ -121,6 +137,7 @@ export function ArchitectVerificationList() {
     const filters: AppliedFilters = {
       status: statusFilter === 'ALL' ? undefined : statusFilter,
       requestType: requestTypeFilter === 'ALL' ? undefined : requestTypeFilter,
+      zone: zoneFilter === 'ALL' ? undefined : zoneFilter,
       region: regionFilter === 'ALL' ? undefined : regionFilter,
     };
 
@@ -136,8 +153,9 @@ export function ArchitectVerificationList() {
   const handleReset = () => {
     setStatusFilter('VERIFICATION_REQUESTED');
     setRequestTypeFilter('ALL');
+    setZoneFilter('ALL');
     setRegionFilter('ALL');
-    setSearchFieldType('ownerName');
+    setSearchFieldType('periodNumber');
     setSearchKeyword('');
     setAppliedFilters({ status: 'VERIFICATION_REQUESTED' });
     setCurrentPage(0);
@@ -185,48 +203,44 @@ export function ArchitectVerificationList() {
       >
         <form onSubmit={handleApplyFilters} className="bg-white">
         <div className="flex flex-col">
-          {/* First Row: 요청유형 (라디오) | 상태 (셀렉트) | 건축위치 (셀렉트) */}
-          <div className="flex items-center gap-2" style={{ borderTop: '1px solid #D2D2D2' }}>
-            {/* Group 1: 요청유형 */}
-            <div className="flex items-center gap-3 flex-1">
-              <label className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-                요청유형
-              </label>
-              <div className="flex items-center gap-4">
-                <Radio
-                  label="전체"
-                  value="ALL"
-                  name="requestType"
-                  checked={requestTypeFilter === 'ALL'}
-                  onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
-                />
-                <Radio
-                  label="추천"
-                  value="RECOMMENDATION"
-                  name="requestType"
-                  checked={requestTypeFilter === 'RECOMMENDATION'}
-                  onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
-                />
-                <Radio
-                  label="우선지정"
-                  value="PRIORITY_DESIGNATION"
-                  name="requestType"
-                  checked={requestTypeFilter === 'PRIORITY_DESIGNATION'}
-                  onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
-                />
-              </div>
+          {/* First Row: 요청유형 | 상태 | 지역구 */}
+          <div className="flex items-center" style={{ borderTop: '1px solid #D2D2D2' }}>
+            <label className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              요청유형
+            </label>
+            <div className="flex items-center gap-4 px-3">
+              <Radio
+                label="전체"
+                value="ALL"
+                name="requestType"
+                checked={requestTypeFilter === 'ALL'}
+                onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
+              />
+              <Radio
+                label="추천"
+                value="RECOMMENDATION"
+                name="requestType"
+                checked={requestTypeFilter === 'RECOMMENDATION'}
+                onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
+              />
+              <Radio
+                label="우선지정"
+                value="PRIORITY_DESIGNATION"
+                name="requestType"
+                checked={requestTypeFilter === 'PRIORITY_DESIGNATION'}
+                onChange={(e) => setRequestTypeFilter(e.target.value as typeof requestTypeFilter)}
+              />
             </div>
 
-            {/* Group 2: 상태 */}
-            <div className="flex items-center gap-3 flex-1">
-              <label htmlFor="statusFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-                상태
-              </label>
+            <label htmlFor="statusFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              상태
+            </label>
+            <div className="px-3">
               <Select
                 id="statusFilter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="flex-1"
+                className="w-[180px]"
                 style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
               >
                 {statusOptions.map((option) => (
@@ -237,16 +251,35 @@ export function ArchitectVerificationList() {
               </Select>
             </div>
 
-            {/* Group 3: 건축위치 */}
-            <div className="flex items-center gap-3 flex-1">
-              <label htmlFor="regionFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
-                건축위치
-              </label>
+            <label htmlFor="zoneFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              권역
+            </label>
+            <div className="px-3">
+              <Select
+                id="zoneFilter"
+                value={zoneFilter}
+                onChange={(e) => setZoneFilter(e.target.value)}
+                className="w-[140px]"
+                style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
+              >
+                <option value="ALL">전체 권역</option>
+                {ZONE_OPTIONS.map((zone) => (
+                  <option key={zone.value} value={zone.value}>
+                    {zone.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <label htmlFor="regionFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              지역구
+            </label>
+            <div className="px-3">
               <Select
                 id="regionFilter"
                 value={regionFilter}
                 onChange={(e) => setRegionFilter(e.target.value as typeof regionFilter)}
-                className="flex-1"
+                className="w-[180px]"
                 style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
               >
                 <option value="ALL">전체 지역</option>
@@ -271,13 +304,16 @@ export function ArchitectVerificationList() {
               className="w-[180px]"
               style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
             >
+              <option value="periodNumber">기수</option>
+              <option value="requestNumber">접수번호</option>
               <option value="ownerName">건축주</option>
-              <option value="supervisorName">감리자명</option>
+              <option value="siteDetailAddress">건축위치</option>
+              <option value="supervisorName">감리자</option>
               <option value="supervisorLicense">자격번호</option>
             </Select>
 
             <TextField
-              placeholder="입력하세요"
+              placeholder="검색어를 입력하세요"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               className="flex-1"
@@ -298,15 +334,9 @@ export function ArchitectVerificationList() {
       {/* Action Bar */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center">
-          <span style={{ color: '#010101', fontSize: '18px', fontWeight: 500, lineHeight: 'normal', letterSpacing: '-0.45px' }}>
-            총 게시물
-          </span>
-          <span style={{ color: '#0082FF', fontSize: '16px', fontWeight: 500, lineHeight: 'normal', letterSpacing: '-0.4px', marginLeft: '8px' }}>
-            {totalElements}
-          </span>
-          <span style={{ color: '#010101', fontSize: '16px', fontWeight: 400, lineHeight: 'normal', letterSpacing: '-0.4px' }}>
-            건
-          </span>
+          <span style={{ color: '#010101', fontSize: '18px', fontWeight: 500, lineHeight: 'normal', letterSpacing: '-0.45px' }}>총 게시물</span>
+          <span style={{ color: '#0082FF', fontSize: '16px', fontWeight: 500, lineHeight: 'normal', letterSpacing: '-0.4px', marginLeft: '8px' }}>{totalElements}</span>
+          <span style={{ color: '#010101', fontSize: '16px', fontWeight: 400, lineHeight: 'normal', letterSpacing: '-0.4px' }}>건</span>
         </div>
         <div className="flex items-center gap-3">
           <Button onClick={() => { toast.info('엑셀 다운로드 기능은 준비중입니다.'); }} className="flex items-center gap-[10px]" style={{ width: 'auto', flexShrink: 0, height: '36px', minHeight: '36px', maxHeight: '36px', borderRadius: '5px', border: '1px solid #186F3D', background: '#FFF', padding: '5px 10px', color: '#186F3D', fontSize: '14px', fontWeight: 600, lineHeight: '140%', letterSpacing: '-0.35px', whiteSpace: 'nowrap' }}>
@@ -328,21 +358,24 @@ export function ArchitectVerificationList() {
             <caption className="sr-only">감리자 추천 목록</caption>
             <thead className="bg-[#EDF6FF]">
               <tr className="h-12">
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">No.</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '60px' }}>No</th>
                 <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '65px' }}>기수</th>
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">요청번호</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>요청일</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]">지정일</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '90px' }}>요청타입</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]">건축위치</th>
-                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">감리자</th>
-                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '130px' }}>상태</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '120px' }}>접수번호</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>건축주</th>
+                <th className="px-5 text-left text-[14px] font-semibold text-[#010101]">건축위치</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>규모</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '110px' }}>의뢰일자</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>감리자</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '110px' }}>추천날짜</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '110px' }}>진행상태</th>
+                <th className="px-5 text-right text-[14px] font-semibold text-[#010101]" style={{ minWidth: '100px' }}>실적회비</th>
+                <th className="px-5 text-center text-[14px] font-semibold text-[#010101]" style={{ minWidth: '80px' }}>추천회차</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-neutral/70 text-[14px] text-heading">
               {isLoading && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-secondary">
+                  <td colSpan={12} className="px-4 py-12 text-center text-secondary">
                     불러오는 중...
                   </td>
                 </tr>
@@ -350,49 +383,62 @@ export function ArchitectVerificationList() {
 
               {!isLoading && requests.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-secondary">
+                  <td colSpan={12} className="px-4 py-12 text-center text-secondary">
                     조회된 요청이 없습니다.
                   </td>
                 </tr>
               )}
 
               {!isLoading &&
-                requests.map((request, index) => (
+                requests.map((request) => (
                   <tr
                     key={request.id}
                     onClick={() => handleRowClick(request.id)}
                     className="bg-white hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="px-5 py-4 align-middle text-left text-secondary">
-                      {totalElements - currentPage * 10 - index}
+                    <td className="px-5 py-4 align-middle text-center text-secondary">
+                      {request.id}
                     </td>
                     <td className="px-5 py-4 align-middle text-center text-secondary">
                       {request.periodNumber ? `${request.periodNumber}기` : '-'}
                     </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      <span className="font-semibold text-heading">
+                        {request.requestNumber || '-'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      {request.ownerName || '-'}
+                    </td>
                     <td className="px-5 py-4 align-middle text-left">
                       <span className="text-[15px] font-semibold text-heading">
-                        {request.requestNumber}
+                        {request.siteAddress || request.siteDetailAddress || '-'}
                       </span>
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      {request.demolitionScale || '-'}
                     </td>
                     <td className="px-5 py-4 align-middle text-center text-secondary">
                       {formatDate(request.requestDate)}
                     </td>
-                    <td className="px-5 py-4 align-middle text-center text-secondary">
-                      {request.designationDate ? formatDate(request.designationDate) : '-'}
-                    </td>
                     <td className="px-5 py-4 align-middle text-center">
-                      {getDemolitionTypeLabel(request.requestType)}
-                    </td>
-                    <td className="px-5 py-4 align-middle text-center">
-                      {request.region || '-'}
-                    </td>
-                    <td className="px-5 py-4 align-middle text-left">
                       {request.supervisorName || '-'}
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center text-secondary">
+                      {formatDate(request.verificationRequestedAt)}
                     </td>
                     <td className="px-5 py-4 align-middle text-center">
                       <span className={getDemolitionStatusBadge(request.status)} style={{ display: 'inline-block', width: '88px', textAlign: 'center', padding: '8px 12px', borderRadius: '4px' }}>
                         {getDemolitionStatusLabel(request.status)}
                       </span>
+                    </td>
+                    <td className="px-5 py-4 align-middle text-right">
+                      {request.associationFee != null
+                        ? `${request.associationFee.toLocaleString()}원`
+                        : '-'}
+                    </td>
+                    <td className="px-5 py-4 align-middle text-center">
+                      {request.recommendationRound ?? '-'}
                     </td>
                   </tr>
                 ))}

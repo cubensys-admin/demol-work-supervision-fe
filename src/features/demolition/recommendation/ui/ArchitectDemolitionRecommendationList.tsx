@@ -19,6 +19,13 @@ import { Select } from '@/shared/ui/select';
 import { Radio } from '@/shared/ui/radio';
 import { Pagination } from '@/shared/ui/pagination';
 
+const ZONE_OPTIONS = [
+  { value: '서북권', label: '서북권', districts: ['종로구', '중구', '용산구', '은평구', '서대문구', '마포구'] },
+  { value: '동북권', label: '동북권', districts: ['성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구'] },
+  { value: '동남권', label: '동남권', districts: ['서초구', '강남구', '송파구', '강동구'] },
+  { value: '서남권', label: '서남권', districts: ['양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구'] },
+] as const;
+
 const SEOUL_DISTRICTS = [
   '강남구', '강동구', '강북구', '강서구', '관악구',
   '광진구', '구로구', '금천구', '노원구', '도봉구',
@@ -30,6 +37,7 @@ const SEOUL_DISTRICTS = [
 type AppliedFilters = {
   status?: DemolitionRequestStatus;
   requestType?: DemolitionRequestType;
+  zone?: string;
   region?: string;
   periodNumber?: string;
   requestNumber?: string;
@@ -55,6 +63,7 @@ export function ArchitectDemolitionRecommendationList() {
   const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<'ALL' | DemolitionRequestStatus>('ALL');
   const [requestTypeFilter, setRequestTypeFilter] = useState<'ALL' | DemolitionRequestType>('ALL');
+  const [zoneFilter, setZoneFilter] = useState<'ALL' | string>('ALL');
   const [regionFilter, setRegionFilter] = useState<'ALL' | (typeof SEOUL_DISTRICTS)[number]>('ALL');
   const [searchFieldType, setSearchFieldType] = useState<SearchFieldType>('periodNumber');
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -99,6 +108,7 @@ export function ArchitectDemolitionRecommendationList() {
         size: pageSize,
         status: appliedFilters.status,
         requestType: appliedFilters.requestType,
+        zone: appliedFilters.zone,
         region: appliedFilters.region,
         periodNumber: appliedFilters.periodNumber ? Number(appliedFilters.periodNumber) : undefined,
         requestNumber: appliedFilters.requestNumber,
@@ -127,6 +137,7 @@ export function ArchitectDemolitionRecommendationList() {
     const filters: AppliedFilters = {
       status: statusFilter === 'ALL' ? undefined : statusFilter,
       requestType: requestTypeFilter === 'ALL' ? undefined : requestTypeFilter,
+      zone: zoneFilter === 'ALL' ? undefined : zoneFilter,
       region: regionFilter === 'ALL' ? undefined : regionFilter,
     };
 
@@ -142,6 +153,7 @@ export function ArchitectDemolitionRecommendationList() {
   const handleReset = () => {
     setStatusFilter('ALL');
     setRequestTypeFilter('ALL');
+    setZoneFilter('ALL');
     setRegionFilter('ALL');
     setSearchFieldType('periodNumber');
     setSearchKeyword('');
@@ -234,6 +246,26 @@ export function ArchitectDemolitionRecommendationList() {
                 {statusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <label htmlFor="zoneFilter" className="w-[100px] h-[50px] px-3 py-1.5 bg-[#EDF6FF] flex items-center text-[14px] font-semibold text-[#010101] tracking-[-0.35px] flex-shrink-0">
+              권역
+            </label>
+            <div className="px-3">
+              <Select
+                id="zoneFilter"
+                value={zoneFilter}
+                onChange={(e) => setZoneFilter(e.target.value)}
+                className="w-[140px]"
+                style={{ height: '36px', minHeight: '36px', maxHeight: '36px' }}
+              >
+                <option value="ALL">전체 권역</option>
+                {ZONE_OPTIONS.map((zone) => (
+                  <option key={zone.value} value={zone.value}>
+                    {zone.label}
                   </option>
                 ))}
               </Select>

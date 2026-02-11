@@ -69,6 +69,7 @@ export async function getArchitectDemolitionRequests(
     status?: DemolitionRequestStatus | DemolitionRequestStatus[];
     requestType?: DemolitionRequestType;
     region?: string;
+    zone?: string;
     periodNumber?: number;
     requestNumber?: string;
     ownerName?: string;
