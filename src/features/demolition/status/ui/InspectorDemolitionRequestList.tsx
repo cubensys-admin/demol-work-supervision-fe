@@ -23,10 +23,10 @@ type AppliedFilters = {
   toDate?: string;
   periodNumber?: string;
   ownerName?: string;
-  siteAddress?: string;
+  region?: string;
 };
 
-type SearchFieldType = 'periodNumber' | 'ownerName' | 'siteAddress';
+type SearchFieldType = 'periodNumber' | 'ownerName' | 'region';
 
 /**
  * Inspector Demolition Request List
@@ -75,7 +75,7 @@ export function InspectorDemolitionRequestList() {
         toDate: appliedFilters.toDate,
         periodNumber: appliedFilters.periodNumber ? Number(appliedFilters.periodNumber) : undefined,
         ownerName: appliedFilters.ownerName,
-        siteAddress: appliedFilters.siteAddress,
+        region: appliedFilters.region,
       });
       setRequests(response.content);
       setTotalPages(response.totalPages);
@@ -222,7 +222,7 @@ export function InspectorDemolitionRequestList() {
             >
               <option value="periodNumber">기수</option>
               <option value="ownerName">건축주</option>
-              <option value="siteAddress">건축위치</option>
+              <option value="region">건축위치(구)</option>
             </Select>
 
             <TextField
@@ -369,7 +369,7 @@ export function InspectorDemolitionRequestList() {
                       {request.requestNumber || '-'}
                     </td>
                     <td className="px-5 py-4 align-middle text-center">
-                      -
+                      {request.ownerName || '-'}
                     </td>
                     <td className="px-5 py-4 align-middle text-left">
                       <span className="text-[15px] font-semibold text-heading">

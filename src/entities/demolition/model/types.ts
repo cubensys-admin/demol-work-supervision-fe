@@ -119,6 +119,7 @@ export interface DemolitionRequestSummary {
   zone?: string;
   residentialArea?: string;
   supervisorName?: string;
+  ownerName?: string; // 건축주명
   verificationRequestedAt?: string;
   verificationCompletedAt?: string;
   supervisorAssignedAt?: string;
